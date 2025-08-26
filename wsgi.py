@@ -1,6 +1,6 @@
 import sys
 
-path = "/home/dimalalov/my-first-blog"
+path = "/home/Dm1tryLalov/my-first-blog"
 if path not in sys.path:
     sys.path.append(path)
 
