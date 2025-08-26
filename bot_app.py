@@ -7,11 +7,18 @@ from telegram.ext import (
     ContextTypes,
     ConversationHandler,
 )
+from flask import Flask, request
+import asyncio
 
-BOT_TOKEN = "ВАШ_ТОКЕН_ОТ_BOTFATHER"
+app = Flask(__name__)
+
+BOT_TOKEN = "8390374974:AAHCvCO74H-QcUqE6o2VCk6BDs5Ewb5yaQ4"
 
 # Состояния для диалога
 CHOOSING, SALARY, DAYS_M, DAYS_F, DAYS_15, DAYS_31 = range(6)
+
+# Создаем application один раз при запуске
+application = Application.builder().token(BOT_TOKEN).build()
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -136,9 +143,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-def main():
-    application = Application.builder().token(BOT_TOKEN).build()
-
+# Настраиваем обработчики
+def setup_handlers():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -153,8 +159,48 @@ def main():
     )
 
     application.add_handler(conv_handler)
-    application.run_polling()
+
+
+# Инициализируем обработчики при запуске
+setup_handlers()
+
+
+# Обработчик вебхука
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    try:
+        # Получаем обновление от Telegram
+        update = Update.de_json(request.get_json(), application.bot)
+
+        # Обрабатываем обновление асинхронно
+        async def process_update():
+            await application.process_update(update)
+
+        # Запускаем асинхронную обработку
+        asyncio.run(process_update())
+
+        return "", 200
+    except Exception as e:
+        print(f"Ошибка: {e}")
+        return "", 200
+
+
+# Главная страница для проверки
+@app.route("/")
+def home():
+    return "💰 Калькулятор заработной платы работает! Используйте /start в Telegram"
+
+
+# Установка вебхука при запуске
+@app.before_first_request
+def set_webhook():
+    # Замените yourusername на ваш логин PythonAnywhere
+    webhook_url = f"https://dimalalov.pythonanywhere.com/webhook"
+
+    # Устанавливаем вебхук
+    application.bot.set_webhook(webhook_url)
+    print(f"Вебхук установлен: {webhook_url}")
 
 
 if __name__ == "__main__":
-    main()
+    app.run(debug=True)
