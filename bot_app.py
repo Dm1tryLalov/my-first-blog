@@ -9,6 +9,13 @@ from telegram.ext import (
 )
 from flask import Flask, request
 import asyncio
+import logging
+
+# Настройка логирования
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
 app = Flask(__name__)
 
@@ -19,7 +26,6 @@ CHOOSING, SALARY, DAYS_M, DAYS_F, DAYS_15, DAYS_31 = range(6)
 
 # Создаем application один раз при запуске
 application = Application.builder().token(BOT_TOKEN).build()
-
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [["1 - За весь месяц", "2 - 25 числа"], ["3 - 10 числа"]]
@@ -38,7 +44,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return CHOOSING
 
-
 async def choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice_text = update.message.text
     if "1" in choice_text:
@@ -53,7 +58,6 @@ async def choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("Введите ваш оклад (руб):")
     return SALARY
-
 
 async def get_salary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -73,7 +77,6 @@ async def get_salary(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Пожалуйста, введите число для оклада:")
         return SALARY
 
-
 async def get_days_m(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         context.user_data["day_m"] = float(update.message.text)
@@ -82,7 +85,6 @@ async def get_days_m(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Пожалуйста, введите число:")
         return DAYS_M
-
 
 async def get_days_15(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -93,7 +95,6 @@ async def get_days_15(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Пожалуйста, введите число:")
         return DAYS_15
 
-
 async def get_days_31(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         context.user_data["day_31"] = float(update.message.text)
@@ -102,7 +103,6 @@ async def get_days_31(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Пожалуйста, введите число:")
         return DAYS_31
-
 
 async def get_days_f(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -137,11 +137,9 @@ async def get_days_f(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Пожалуйста, введите число:")
         return DAYS_F
 
-
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Расчет отменен")
     return ConversationHandler.END
-
 
 # Настраиваем обработчики
 def setup_handlers():
@@ -160,10 +158,8 @@ def setup_handlers():
 
     application.add_handler(conv_handler)
 
-
-# Инициализируем обработчики при запуске
+# Инициализируем обработчики
 setup_handlers()
-
 
 # Обработчик вебхука
 @app.route("/webhook", methods=["POST"])
@@ -171,36 +167,37 @@ def webhook():
     try:
         # Получаем обновление от Telegram
         update = Update.de_json(request.get_json(), application.bot)
-
-        # Обрабатываем обновление асинхронно
-        async def process_update():
-            await application.process_update(update)
-
-        # Запускаем асинхронную обработку
-        asyncio.run(process_update())
-
+        
+        # Создаем задачу для обработки обновления
+        asyncio.create_task(application.process_update(update))
+        
         return "", 200
     except Exception as e:
         print(f"Ошибка: {e}")
         return "", 200
-
 
 # Главная страница для проверки
 @app.route("/")
 def home():
     return "💰 Калькулятор заработной платы работает! Используйте /start в Telegram"
 
-
 # Установка вебхука при запуске
 @app.before_first_request
 def set_webhook():
-    # Замените yourusername на ваш логин PythonAnywhere
+    # Замените на ваш реальный URL PythonAnywhere
     webhook_url = f"https://dimalalov.pythonanywhere.com/webhook"
-
-    # Устанавливаем вебхук
-    application.bot.set_webhook(webhook_url)
-    print(f"Вебхук установлен: {webhook_url}")
-
+    
+    # Устанавливаем вебхук асинхронно
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        loop.run_until_complete(application.bot.set_webhook(webhook_url))
+        print(f"Вебхук установлен: {webhook_url}")
+    except Exception as e:
+        print(f"Ошибка установки вебхука: {e}")
+    finally:
+        loop.close()
 
 if __name__ == "__main__":
     app.run(debug=True)
